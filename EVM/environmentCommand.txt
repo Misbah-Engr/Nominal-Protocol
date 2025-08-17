@@ -1,0 +1,9 @@
+WARNING: Do not put any important key like Private hkey here. Copy the command and set vaiables in the terminal at the time you are deploying.
+
+export RPC_URL=https://your.rpc
+export PRIVATE_KEY=0x...
+export TREASURY=0xYourTreasury
+export REG_FEE_WEI=10000000000000000
+export REFERRER_BPS=300
+
+forge script script/DeployNameRegistryV1.s.sol:DeployNameRegistryV1 --rpc-url "$RPC_URL" --broadcast -vv

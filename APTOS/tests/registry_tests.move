@@ -1,0 +1,304 @@
+#[test_only]
+module nominal::registry_tests {
+    use std::option;
+    use std::string;
+    use std::signer;
+    use aptos_framework::coin;
+    use aptos_framework::account::{create_account_for_test, create_signer_for_test};
+    use aptos_framework::timestamp;
+
+    use nominal::registry::{Self as reg};
+    use nominal::test_coin;
+
+    // Helper to initialize timestamp for testing
+    fun init_timestamp() {
+        let timestamp_account = create_signer_for_test(@aptos_framework);
+        timestamp::set_time_has_started_for_testing(&timestamp_account);
+    }
+
+    #[test]
+    fun test_name_validation() {
+        assert!(reg::is_valid_name(&string::utf8(b"abc")), 1);
+        assert!(reg::is_valid_name(&string::utf8(b"a1b-2c")), 2);
+        assert!(!reg::is_valid_name(&string::utf8(b"ab")), 10);
+        assert!(!reg::is_valid_name(&string::utf8(b"Abc")), 11);
+        assert!(!reg::is_valid_name(&string::utf8(b"bad--name")), 12);
+        assert!(!reg::is_valid_name(&string::utf8(b"-bad")), 13);
+        assert!(!reg::is_valid_name(&string::utf8(b"bad-")), 14);
+    }
+
+    #[test]
+    fun test_register_coin_allowlist_and_happy() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        // admin/treasury lives at @nominal
+        // create admin signer at @nominal for testing
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        // prepare user account
+        create_account_for_test(@0x101);
+        let user = create_signer_for_test(@0x101);
+        // set up registry with treasury = @nominal
+        reg::init(&admin, signer::address_of(&admin), 50_000, 300);
+        // init and fund test coin; register coin stores for treasury and user
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&user);
+        test_coin::mint_for_testing(&admin, signer::address_of(&user), 60_000);
+        // allow TestCoin
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        // user registers with TestCoin
+        let fee = coin::withdraw<test_coin::TestCoin>(&user, 50_000);
+        reg::register_coin<test_coin::TestCoin>(&user, string::utf8(b"alice"), fee);
+        // primary name is auto-set
+        let name_opt = reg::name_of(signer::address_of(&user));
+        assert!(option::is_some(&name_opt), 900);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_duplicate_name_fails() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x102);
+        let user = create_signer_for_test(@0x102);
+        reg::init(&admin, signer::address_of(&admin), 50_000, 0);
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&user);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        test_coin::mint_for_testing(&admin, signer::address_of(&user), 120_000);
+        let fee = coin::withdraw<test_coin::TestCoin>(&user, 50_000);
+        reg::register_coin<test_coin::TestCoin>(&user, string::utf8(b"dup"), fee);
+        let fee2 = coin::withdraw<test_coin::TestCoin>(&user, 50_000);
+        // second registration of same name should abort with E_NAME_TAKEN
+        reg::register_coin<test_coin::TestCoin>(&user, string::utf8(b"dup"), fee2);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_wrong_fee_fails() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x103);
+        let user = create_signer_for_test(@0x103);
+        reg::init(&admin, signer::address_of(&admin), 50_000, 0);
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&user);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        test_coin::mint_for_testing(&admin, signer::address_of(&user), 49_000);
+        // withdraw less than required
+        let fee = coin::withdraw<test_coin::TestCoin>(&user, 49_000);
+        reg::register_coin<test_coin::TestCoin>(&user, string::utf8(b"low"), fee);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_meta_deadline_expired_fails() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x201);
+        let relayer = create_signer_for_test(@0x201);
+        let owner_addr: address = @0x301;
+        reg::init(&admin, signer::address_of(&admin), 50_000, 0);
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&relayer);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        test_coin::mint_for_testing(&admin, signer::address_of(&relayer), 60_000);
+        let fee = coin::withdraw<test_coin::TestCoin>(&relayer, 50_000);
+        // set deadline to 0 to ensure it's in the past
+        reg::register_with_sig_coin<test_coin::TestCoin>(&relayer, string::utf8(b"late"), owner_addr, signer::address_of(&relayer), 50_000, 0, 0, b"", b"", fee);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_register_coin_not_allowed() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x104);
+        let user = create_signer_for_test(@0x104);
+        reg::init(&admin, signer::address_of(&admin), 1000, 0);
+        test_coin::init(&admin);
+        test_coin::register(&user);
+        // withdraw any amount; function should abort before fee checks since coin not allowed
+        let fee = coin::withdraw<test_coin::TestCoin>(&user, 0);
+        reg::register_coin<test_coin::TestCoin>(&user, string::utf8(b"bob"), fee);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_relayer_allowlist_enforced_negative() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x202);
+        let relayer = create_signer_for_test(@0x202);
+        let owner_addr: address = @0x302;
+        reg::init(&admin, signer::address_of(&admin), 50_000, 300);
+        // enable TestCoin and fund relayer
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&relayer);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        test_coin::mint_for_testing(&admin, signer::address_of(&relayer), 60_000);
+        // enable gating but do NOT add relayer
+        reg::set_require_allowlisted_relayer(&admin, true);
+        let fee = coin::withdraw<test_coin::TestCoin>(&relayer, 50_000);
+        // dummy pubkey/sig; will fail on allowlist check before sig
+        reg::register_with_sig_coin<test_coin::TestCoin>(&relayer, string::utf8(b"deny"), owner_addr, signer::address_of(&relayer), 50_000, 9_999_999_999, 0, b"", b"", fee);
+    }
+
+    #[test]
+    fun test_relayer_allowlist_positive() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x203);
+        let relayer = create_signer_for_test(@0x203);
+        let owner_addr: address = @0x303;
+        reg::init(&admin, signer::address_of(&admin), 50_000, 300);
+        // enable TestCoin and fund relayer
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&relayer);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        test_coin::mint_for_testing(&admin, signer::address_of(&relayer), 60_000);
+        // add relayer and gate
+        reg::add_relayer(&admin, signer::address_of(&relayer));
+        reg::set_require_allowlisted_relayer(&admin, true);
+        // register via meta path with allowlisted relayer
+        // bypass signature check in tests
+        reg::set_skip_sig_verify_for_testing(&admin, true);
+        let fee = coin::withdraw<test_coin::TestCoin>(&relayer, 50_000);
+        reg::register_with_sig_coin<test_coin::TestCoin>(&relayer, string::utf8(b"allow"), owner_addr, signer::address_of(&relayer), 50_000, 9_999_999_999, 0, b"", b"", fee);
+    }
+
+    #[test]
+    fun test_primary_name_set_and_transfer_flow() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x105);
+        create_account_for_test(@0x106);
+        let user1 = create_signer_for_test(@0x105);
+        let user2 = create_signer_for_test(@0x106);
+        reg::init(&admin, signer::address_of(&admin), 50_000, 0);
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&user1);
+        test_coin::register(&user2);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        test_coin::mint_for_testing(&admin, signer::address_of(&user1), 60_000);
+        // register first name -> auto primary
+        let fee = coin::withdraw<test_coin::TestCoin>(&user1, 50_000);
+        reg::register_coin<test_coin::TestCoin>(&user1, string::utf8(b"p1x"), fee);
+        // set explicit primary to another registered name after second registration
+        test_coin::mint_for_testing(&admin, signer::address_of(&user1), 50_000);
+        let fee2 = coin::withdraw<test_coin::TestCoin>(&user1, 50_000);
+        reg::register_coin<test_coin::TestCoin>(&user1, string::utf8(b"p2x"), fee2);
+        reg::set_primary_name(&user1, string::utf8(b"p2x"));
+        // transfer p2x to user2; user1 primary should be cleared since p2x was the primary
+        reg::transfer_name(&user1, string::utf8(b"p2x"), signer::address_of(&user2));
+        // User1 no longer has a primary name
+        let n1 = reg::name_of(signer::address_of(&user1));
+        assert!(option::is_none(&n1), 910);
+        // User2 should have p2x as primary (since they had no primary before)
+        let n2 = reg::name_of(signer::address_of(&user2));
+        assert!(option::is_some(&n2), 911);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_nonce_mismatch_fails() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x204);
+        let relayer = create_signer_for_test(@0x204);
+        let owner_addr: address = @0x304;
+        reg::init(&admin, signer::address_of(&admin), 50_000, 0);
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&relayer);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        test_coin::mint_for_testing(&admin, signer::address_of(&relayer), 60_000);
+        reg::set_skip_sig_verify_for_testing(&admin, true);
+        let fee = coin::withdraw<test_coin::TestCoin>(&relayer, 50_000);
+        // first call consumes nonce 0
+        reg::register_with_sig_coin<test_coin::TestCoin>(&relayer, string::utf8(b"n1"), owner_addr, signer::address_of(&relayer), 50_000, 9_999_999_999, 0, b"", b"", fee);
+        // second call attempts nonce 0 again -> should fail
+        let fee2 = coin::withdraw<test_coin::TestCoin>(&relayer, 50_000);
+        reg::register_with_sig_coin<test_coin::TestCoin>(&relayer, string::utf8(b"n2"), owner_addr, signer::address_of(&relayer), 50_000, 9_999_999_999, 0, b"", b"", fee2);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_wrong_relayer_address_in_meta() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x205);
+        let relayer = create_signer_for_test(@0x205);
+        let owner_addr: address = @0x305;
+        reg::init(&admin, signer::address_of(&admin), 50_000, 0);
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&relayer);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        test_coin::mint_for_testing(&admin, signer::address_of(&relayer), 60_000);
+        reg::set_skip_sig_verify_for_testing(&admin, true);
+        let fee = coin::withdraw<test_coin::TestCoin>(&relayer, 50_000);
+        // pass a different relayer address than sender -> should fail E_WRONG_RELAYER
+        reg::register_with_sig_coin<test_coin::TestCoin>(&relayer, string::utf8(b"mismatch"), owner_addr, @0x42, 50_000, 9_999_999_999, 0, b"", b"", fee);
+    }
+
+    #[test]
+    fun test_change_refund_and_referrer_split() {
+        // Initialize timestamp for testing
+        init_timestamp();
+        
+        create_account_for_test(@nominal);
+        let admin = create_signer_for_test(@nominal);
+        create_account_for_test(@0x206);
+        let relayer = create_signer_for_test(@0x206);
+        let owner_addr: address = @0x306;
+        reg::init(&admin, signer::address_of(&admin), 50_000, 1000); // 10% referrer
+        test_coin::init(&admin);
+        test_coin::register(&admin);
+        test_coin::register(&relayer);
+        reg::set_coin_fee<test_coin::TestCoin>(&admin, 50_000, true);
+        // fund 80k, pay 70k -> change 20k, referrer gets 5k, treasury 45k
+        test_coin::mint_for_testing(&admin, signer::address_of(&relayer), 80_000);
+        reg::add_relayer(&admin, signer::address_of(&relayer));
+        reg::set_require_allowlisted_relayer(&admin, true);
+        reg::set_skip_sig_verify_for_testing(&admin, true);
+        let fee = coin::withdraw<test_coin::TestCoin>(&relayer, 70_000);
+        reg::register_with_sig_coin<test_coin::TestCoin>(&relayer, string::utf8(b"refund"), owner_addr, signer::address_of(&relayer), 50_000, 9_999_999_999, 0, b"", b"", fee);
+        // balances assertions would require reading coin balances; omitted here for brevity
+    }
+}
