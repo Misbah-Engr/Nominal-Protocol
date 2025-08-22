@@ -1,0 +1,19 @@
+{
+  "name": "nominal-registry-solana",
+  "version": "0.1.0",
+  "description": "Tests for Nominal Registry Solana",
+  "scripts": {
+    "test": "anchor test --skip-local-validator"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/spl-token": "^0.4.6",
+    "@solana/web3.js": "^1.95.2",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^9.1.1",
+    "chai": "^4.3.4",
+    "mocha": "^9.0.0",
+    "ts-mocha": "^11.1.0",
+    "typescript": "^4.9.5"
+  }
+}

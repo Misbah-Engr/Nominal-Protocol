@@ -1,0 +1,71 @@
+# ---- Rust / Cargo ----
+/target/
+**/*.rs.bk
+
+# Keep Cargo.lock for reproducible builds (library+program)
+
+# ---- Anchor / Solana ----
+.anchor/
+**/program-keypair.json
+**/keypair.json
+# Generated IDLs & types (keep if you want them versioned; comment out to ignore)
+# idl/
+# types/
+
+# On-chain build artifacts (avoid committing .so binaries)
+**/*.so
+
+# Local ledger / test validator data
+.test-ledger/
+.solana-test-validator/
+
+# ---- Node / TypeScript ----
+node_modules/
+.npm-cache/
+.pnpm-store/
+*.tsbuildinfo
+
+# ---- Logs & coverage ----
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+coverage/
+coverage-final.json
+lcov.info
+
+# ---- Env / Secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- OS / Editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+.history/
+
+# ---- Misc ----
+*.tgz
+*.tar.gz
+*.zip
+
+# ---- Generated JS (if compiling TS tests) ----
+# dist/
+
+# ---- Build scripts temp ----
+/tmp/
+
+# ---- Optional: remove if you DO want to version these ----
+deploy/
+# idl/
+# types/
+
+# Security note: A keypair JSON already committed should be removed with:
+#   git rm --cached path/to/file && git commit -m "Remove committed keypair" && (rotate if exposed)
