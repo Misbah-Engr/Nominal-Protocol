@@ -1,0 +1,286 @@
+#[test_only]
+module nominal::registry_tests {
+    use std::string;
+    use std::option;
+    use sui::coin;
+    use sui::clock::{Self, Clock};
+    use sui::test_scenario as ts;
+    use sui::tx_context::{TxContext};
+
+    // Import the module and error codes
+    use nominal::registry::{Self as reg, Registry};
+    use nominal::errors;
+
+    struct TestCoin has drop {}
+
+    #[test_only]
+    fun clock_for_testing(ctx: &mut TxContext): Clock {
+        clock::create_for_testing(ctx)
+    }
+
+    #[test]
+    fun test_name_validation_cases() {
+        // Valid names
+        assert!(reg::is_valid_name(&string::utf8(b"abc")), 1);
+        assert!(reg::is_valid_name(&string::utf8(b"a1b-2c")), 2);
+        assert!(reg::is_valid_name(&string::utf8(b"nominal-protocol1")), 3);
+        // Invalid: too short/long, uppercase, spaces, leading/trailing/double hyphen
+        assert!(!reg::is_valid_name(&string::utf8(b"ab")), 10);
+        assert!(!reg::is_valid_name(&string::utf8(b"Abc")), 11);
+        assert!(!reg::is_valid_name(&string::utf8(b"hello world")), 12);
+        assert!(!reg::is_valid_name(&string::utf8(b"-bad")), 13);
+        assert!(!reg::is_valid_name(&string::utf8(b"bad-")), 14);
+        assert!(!reg::is_valid_name(&string::utf8(b"bad--bad")), 15);
+    }
+
+    #[test]
+    fun test_admin_only_setters() {
+        let admin = @0xA1;
+        let user = @0xB1;
+        let treasury = @0xC1;
+        let scenario_val = ts::begin(admin);
+        let scenario = &mut scenario_val;
+
+        {
+            // Create and share the registry in the first tx
+            let ctx = ts::ctx(scenario);
+            let r = reg::new(admin, treasury, 1000, 300, ctx);
+            reg::share(r, ctx);
+        };
+
+        // Test admin can change fee
+        ts::next_tx(scenario, admin);
+        {
+            let r = ts::take_shared<reg::Registry>(scenario);
+            reg::set_registration_fee(&mut r, 2000, ts::ctx(scenario));
+            ts::return_shared(r);
+        };
+
+        // Test user cannot change fee
+        ts::next_tx(scenario, user);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            ts::expect_tx_failure(
+                reg::set_registration_fee(&mut r, 3000, ctx),
+                errors::E_NOT_OWNER()
+            );
+            ts::return_shared(r);
+        };
+
+        ts::end(scenario_val);
+    }
+
+    #[test]
+    fun test_register_sui_happy_and_duplicate() {
+        let admin = @0xA1;
+        let alice = @0xB1;
+        let treasury = @0xC1;
+        let scenario_val = ts::begin(admin);
+        let scenario = &mut scenario_val;
+
+        {
+            // Create and share the registry
+            let ctx = ts::ctx(scenario);
+            let r = reg::new(admin, treasury, 1000, 300, ctx);
+            reg::share(r, ctx);
+        };
+
+        // Test registration
+        ts::next_tx(scenario, alice);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            let fee = coin::mint_for_testing<sui::sui::SUI>(1000, ctx);
+            reg::register_sui(&mut r, string::utf8(b"alice"), fee, &clock, ctx);
+            ts::return_shared(r);
+        };
+
+        // Test duplicate registration fails
+        ts::next_tx(scenario, alice);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            let fee2 = coin::mint_for_testing<sui::sui::SUI>(1000, ctx);
+            ts::expect_tx_failure(
+                reg::register_sui(&mut r, string::utf8(b"alice"), fee2, &clock, ctx),
+                errors::E_NAME_TAKEN()
+            );
+            ts::return_shared(r);
+        };
+
+        ts::end(scenario_val);
+    }
+
+    #[test]
+    fun test_register_sui_wrong_fee() {
+        let admin = @0xA1;
+        let alice = @0xB1;
+        let treasury = @0xC1;
+        let scenario_val = ts::begin(admin);
+        let scenario = &mut scenario_val;
+
+        {
+            // Create and share the registry
+            let ctx = ts::ctx(scenario);
+            let r = reg::new(admin, treasury, 1000, 0, ctx);
+            reg::share(r, ctx);
+        };
+
+        // Test fee validation (under)
+        ts::next_tx(scenario, alice);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            let fee_under = coin::mint_for_testing<sui::sui::SUI>(999, ctx);
+            ts::expect_tx_failure(
+                reg::register_sui(&mut r, string::utf8(b"alice-under"), fee_under, &clock, ctx),
+                errors::E_WRONG_FEE()
+            );
+            ts::return_shared(r);
+        };
+
+        // Test fee validation (over is ok, contract should refund)
+        ts::next_tx(scenario, alice);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            let fee_over = coin::mint_for_testing<sui::sui::SUI>(1001, ctx);
+            reg::register_sui(&mut r, string::utf8(b"alice-over"), fee_over, &clock, ctx);
+            ts::return_shared(r);
+        };
+
+        ts::end(scenario_val);
+    }
+
+    #[test]
+    fun test_register_coin_allowlist_and_happy() {
+        let admin = @0xA1;
+        let bob = @0xB2;
+        let treasury = @0xC1;
+        let scenario_val = ts::begin(admin);
+        let scenario = &mut scenario_val;
+
+        {
+            // Create and share the registry
+            let ctx = ts::ctx(scenario);
+            let r = reg::new(admin, treasury, 1000, 0, ctx);
+            reg::share(r, ctx);
+        };
+
+        // Test coin registration (not allowed yet)
+        ts::next_tx(scenario, bob);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            let fee_fail = coin::mint_for_testing<TestCoin>(50_000, ctx);
+            ts::expect_tx_failure(
+                reg::register_coin<TestCoin>(&mut r, string::utf8(b"bob-fail"), fee_fail, &clock, ctx),
+                errors::E_COIN_NOT_ALLOWED()
+            );
+            ts::return_shared(r);
+        };
+
+        // Allow the coin
+        ts::next_tx(scenario, admin);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            reg::set_coin_fee<TestCoin>(&mut r, 50_000, true, ts::ctx(scenario));
+            ts::return_shared(r);
+        };
+
+        // Test coin registration (now allowed)
+        ts::next_tx(scenario, bob);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            let fee_ok = coin::mint_for_testing<TestCoin>(50_000, ctx);
+            reg::register_coin<TestCoin>(&mut r, string::utf8(b"bob-ok"), fee_ok, &clock, ctx);
+            ts::return_shared(r);
+        };
+
+        ts::end(scenario_val);
+    }
+
+    #[test]
+    fun test_set_resolved_and_transfer() {
+        let admin = @0xA1;
+        let alice = @0xB1;
+        let bob = @0xB2;
+        let treasury = @0xC1;
+        let scenario_val = ts::begin(admin);
+        let scenario = &mut scenario_val;
+
+        {
+            // Create and share the registry
+            let ctx = ts::ctx(scenario);
+            let r = reg::new(admin, treasury, 1000, 0, ctx);
+            reg::share(r, ctx);
+        };
+
+        // Register a name for alice
+        ts::next_tx(scenario, alice);
+        {
+            let r = ts::take_shared<reg::Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            let fee = coin::mint_for_testing<sui::sui::SUI>(1000, ctx);
+            reg::register_sui(&mut r, string::utf8(b"own"), fee, &clock, ctx);
+            ts::return_shared(r);
+        };
+
+        // Bob can't set resolved addr for alice's name
+        ts::next_tx(scenario, bob);
+        {
+            let r = ts::take_shared<reg::Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            ts::expect_tx_failure(
+                reg::set_resolved(&mut r, string::utf8(b"own"), option::some(bob), &clock, ctx),
+                errors::E_NOT_OWNER()
+            );
+            ts::return_shared(r);
+        };
+
+        // Alice sets her resolved address
+        ts::next_tx(scenario, alice);
+        {
+            let r = ts::take_shared<reg::Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            reg::set_resolved(&mut r, string::utf8(b"own"), option::some(alice), &clock, ctx);
+            ts::return_shared(r);
+        };
+
+        // Alice transfers name to Bob
+        ts::next_tx(scenario, alice);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            reg::transfer_name(&mut r, string::utf8(b"own"), bob, &clock, ctx);
+            ts::return_shared(r);
+        };
+
+        // Alice can no longer manage the name
+        ts::next_tx(scenario, alice);
+        {
+            let r = ts::take_shared<Registry>(scenario);
+            let ctx = ts::ctx(scenario);
+            let clock = clock_for_testing(ctx);
+            ts::expect_tx_failure(
+                reg::set_resolved(&mut r, string::utf8(b"own"), option::none(), &clock, ctx),
+                errors::E_NOT_OWNER()
+            );
+            ts::return_shared(r);
+        };
+
+        ts::end(scenario_val);
+    }
+}

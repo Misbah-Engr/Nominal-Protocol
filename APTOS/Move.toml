@@ -1,0 +1,12 @@
+[package]
+name = "NominalAptos"
+version = "0.1.0"
+
+[addresses]
+nominal = "0xBEEF"
+std = "0x1"
+aptos_framework = "0x1"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "aptos-node-v1.21.2" }
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-stdlib", rev = "aptos-node-v1.21.2" }

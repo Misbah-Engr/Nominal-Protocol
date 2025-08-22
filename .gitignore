@@ -1,71 +1,66 @@
-# ---- Rust / Cargo ----
-/target/
-**/*.rs.bk
+# ---- General Cross-Chain ----
+# Build artifacts
+build/
+target/
 
-# Keep Cargo.lock for reproducible builds (library+program)
+# Environment variables
+.env
+.env.*
+!.env.example
 
-# ---- Anchor / Solana ----
-.anchor/
-**/program-keypair.json
-**/keypair.json
-# Generated IDLs & types (keep if you want them versioned; comment out to ignore)
-# idl/
-# types/
+# System files
+.DS_Store
+Thumbs.db
 
-# On-chain build artifacts (avoid committing .so binaries)
-**/*.so
+# Editor files
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.history/
 
-# Local ledger / test validator data
-.test-ledger/
-.solana-test-validator/
-
-# ---- Node / TypeScript ----
+# Dependency directories
 node_modules/
 .npm-cache/
 .pnpm-store/
+
+# Test artifacts
+coverage/
+coverage-final.json
+lcov.info
+
+# Docker artifacts
+.docker/
+
+# ---- Solana / Anchor Specific ----
+.anchor/
+**/program-keypair.json
+**/keypair.json
+**/*.so
+.test-ledger/
+.solana-test-validator/
+deploy/
+# idl/
+# types/
+
+# ---- Rust / Cargo ----
+**/*.rs.bk
 *.tsbuildinfo
 
-# ---- Logs & coverage ----
+# ---- Aptos CLI artifacts ----
+.aptos/
+
+# ---- Logs ----
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 logs/
 *.log
-coverage/
-coverage-final.json
-lcov.info
-
-# ---- Env / Secrets ----
-.env
-.env.*
-!.env.example
-
-# ---- OS / Editor ----
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-*.swp
-*.swo
-.history/
 
 # ---- Misc ----
 *.tgz
 *.tar.gz
 *.zip
-
-# ---- Generated JS (if compiling TS tests) ----
-# dist/
-
-# ---- Build scripts temp ----
 /tmp/
-
-# ---- Optional: remove if you DO want to version these ----
-deploy/
-# idl/
-# types/
-
-# Security note: A keypair JSON already committed should be removed with:
-#   git rm --cached path/to/file && git commit -m "Remove committed keypair" && (rotate if exposed)

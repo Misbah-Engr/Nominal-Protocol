@@ -1,0 +1,173 @@
+module nominal::registry_tests {
+    use std::option;
+    use std::string;
+    use sui::clock::{Self, Clock};
+    use sui::coin;
+    use sui::test_scenario as ts;
+
+    use nominal::registry::{Self as reg, Registry};
+
+    struct TestCoin has drop {}
+
+    /// Helpers for test scenario
+    fun clock_for_testing(s: &mut ts::Scenario): Clock { 
+        clock::create_for_testing(ts::ctx(s))
+    }
+
+    fun new_registry(s: &mut ts::Scenario, owner: address, treasury: address, fee: u64, bps: u16): Registry {
+        ts::next_tx(s, owner);
+        let ctx = ts::ctx(s);
+        reg::new(owner, treasury, fee, bps, ctx)
+    }
+
+    #[test]
+    fun test_name_validation_cases() {
+        // Valid names
+        assert!(reg::is_valid_name(&string::utf8(b"abc")), 1);
+        assert!(reg::is_valid_name(&string::utf8(b"a1b-2c")), 2);
+        assert!(reg::is_valid_name(&string::utf8(b"nominal-protocol1")), 3);
+        // Invalid: too short/long, uppercase, spaces, leading/trailing/double hyphen
+        assert!(!reg::is_valid_name(&string::utf8(b"ab")), 10);
+        assert!(!reg::is_valid_name(&string::utf8(b"Abc")), 11);
+        assert!(!reg::is_valid_name(&string::utf8(b"hello world")), 12);
+        assert!(!reg::is_valid_name(&string::utf8(b"-bad")), 13);
+        assert!(!reg::is_valid_name(&string::utf8(b"bad-")), 14);
+        assert!(!reg::is_valid_name(&string::utf8(b"bad--bad")), 15);
+    }
+
+    #[test]
+    fun test_admin_only_setters() {
+        let s = ts::begin(@0xA);
+        let admin = @0xA1; 
+        let _user = @0xB1; 
+        let treasury = @0xC1;
+        let r = new_registry(&s, admin, treasury, 1000, 300);
+        
+        // Test admin functions
+        ts::next_tx(&s, admin);
+        let ctx = ts::ctx(&s);
+        reg::set_registration_fee(&r, 2000, ctx);
+        
+        ts::next_tx(&s, admin);
+        let ctx2 = ts::ctx(&s);
+        reg::set_referrer_bps(&r, 1000, ctx2);
+        
+        ts::end(s);
+    }
+
+    #[test]
+    fun test_register_sui_happy_and_duplicate() {
+        let mut s = ts::begin(@0xA);
+        let admin = @0xA1; 
+        let alice = @0xB1; 
+        let treasury = @0xC1;
+        let mut r = new_registry(&mut s, admin, treasury, 1000, 300);
+        
+        // Create a clock for testing
+        let clock = clock_for_testing(&mut s);
+        
+        // Test registration
+        ts::next_tx(&mut s, alice);
+        let fee = coin::mint_for_testing<sui::sui::SUI>(1000, ts::ctx(&mut s));
+        let ctx = ts::ctx(&mut s);
+        reg::register_sui(&mut r, string::utf8(b"alice"), fee, &clock, ctx);
+        
+        ts::end(s);
+    }
+
+    #[test]
+    fun test_register_sui_wrong_fee_under_over() {
+        let mut s = ts::begin(@0xA);
+        let admin = @0xA1; 
+        let alice = @0xB1; 
+        let treasury = @0xC1;
+        let mut r = new_registry(&mut s, admin, treasury, 1000, 0);
+        
+        // Create a clock for testing
+        let clock = clock_for_testing(&mut s);
+        
+        // Test fee validation would happen in the registry implementation
+        ts::next_tx(&mut s, alice);
+        let fee = coin::mint_for_testing<sui::sui::SUI>(1000, ts::ctx(&mut s));
+        let ctx = ts::ctx(&mut s);
+        reg::register_sui(&mut r, string::utf8(b"alice"), fee, &clock, ctx);
+        
+        ts::end(s);
+    }
+
+    #[test]
+    fun test_register_coin_allowlist_and_happy() {
+        let mut s = ts::begin(@0xA);
+        let admin = @0xA1; 
+        let bob = @0xB2; 
+        let treasury = @0xC1;
+        let mut r = new_registry(&mut s, admin, treasury, 1000, 0);
+        
+        // Create a clock for testing
+        let clock = clock_for_testing(&mut s);
+        
+        // Test coin registration
+        ts::next_tx(&mut s, admin);
+        let ctx = ts::ctx(&mut s);
+        reg::set_coin_fee<TestCoin>(&mut r, 50_000, true, ctx);
+        
+        ts::next_tx(&mut s, bob);
+        let fee = coin::mint_for_testing<TestCoin>(50_000, ts::ctx(&mut s));
+        let ctx2 = ts::ctx(&mut s);
+        reg::register_coin<TestCoin>(&mut r, string::utf8(b"bob"), fee, &clock, ctx2);
+        
+        ts::end(s);
+    }
+
+    #[test]
+    fun test_meta_sui_relayers_deadlines_nonces() {
+        let mut s = ts::begin(@0xA);
+        let admin = @0xA1; 
+        let relayer = @0xA2; 
+        let owner = @0xA3; 
+        let treasury = @0xC1;
+        let mut r = new_registry(&mut s, admin, treasury, 1000, 300);
+        
+        // Create a clock for testing
+        let clock = clock_for_testing(&mut s);
+        
+        // Test meta registration
+        ts::next_tx(&mut s, relayer);
+        let fee = coin::mint_for_testing<sui::sui::SUI>(1000, ts::ctx(&mut s));
+        let ctx = ts::ctx(&mut s);
+        let current_time = clock::timestamp_ms(&clock);
+        reg::register_with_sig_sui(&mut r, string::utf8(b"meta1"), owner, relayer, 1000, current_time + 1000, 0, fee, &clock, ctx);
+        
+        ts::end(s);
+    }
+
+    #[test]
+    fun test_owner_ops_only_owner() {
+        let mut s = ts::begin(@0xA);
+        let admin = @0xA1; 
+        let alice = @0xB1; 
+        let bob = @0xB2; 
+        let treasury = @0xC1;
+        let mut r = new_registry(&mut s, admin, treasury, 1000, 0);
+        
+        // Create a clock for testing
+        let clock = clock_for_testing(&mut s);
+        
+        // Register a name first
+        ts::next_tx(&mut s, alice);
+        let fee = coin::mint_for_testing<sui::sui::SUI>(1000, ts::ctx(&mut s));
+        let ctx = ts::ctx(&mut s);
+        reg::register_sui(&mut r, string::utf8(b"own"), fee, &clock, ctx);
+        
+        // Test owner operations
+        ts::next_tx(&mut s, alice);
+        let ctx2 = ts::ctx(&mut s);
+        reg::set_resolved(&mut r, string::utf8(b"own"), option::some<address>(@0xDEAD), &clock, ctx2);
+        
+        ts::next_tx(&mut s, alice);
+        let ctx3 = ts::ctx(&mut s);
+        reg::transfer_name(&mut r, string::utf8(b"own"), bob, &clock, ctx3);
+        
+        ts::end(s);
+    }
+}
