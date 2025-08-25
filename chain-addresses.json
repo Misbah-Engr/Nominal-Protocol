@@ -1,0 +1,121 @@
+{
+  "sui": {
+    "chain_id": "testnet",
+    "network": "testnet",
+    "registry_package_id": "0xff9e2749778cfa2ea7419d5850b00c8fc441952cab6b5f4460d8820e0161e27e",
+    "token_package_id": "0xd3502b96cb6e4451cf8b4a0a64bb9c64d2ebb36b03d361f5be088c00a942172a",
+    "faucet_cap_id": "0x0f3cccef154c6a8bc09f030e0363fb506abf6960259578ad2baadb05f5125c19",
+    "coin_metadata_id": "0x3161871f468f411bc81452083324e6351ad48d17a272b9cbe9b92c1e57d36865",
+    "upgrade_cap_id": "0x28e1b7f17f71aab6c249b3c389277731b3429b8959b9a41b174362ef17d01950",
+    "deployer": "0x186b5c6d8d3a9a2942ece0314423d49a8e7278512419963daac4f3728d0dba55",
+    "owner": "0x186b5c6d8d3a9a2942ece0314423d49a8e7278512419963daac4f3728d0dba55",
+    "treasury": "0x186b5c6d8d3a9a2942ece0314423d49a8e7278512419963daac4f3728d0dba55",
+    "registration_fee": "1.0",
+    "registration_fee_currency": "SUI",
+    "referrer_bps": 100,
+    "token_name": "Mock Nominal Token",
+    "token_symbol": "MNOMINAL",
+    "token_decimals": 9,
+    "faucet_claim_amount": "100",
+    "faucet_cooldown_seconds": 3600,
+    "deployment_transaction": "GBKdmPZyFGvmSpaVu9MNUL4tKQD6wfbHPtubYa9jD2UW"
+  },
+  "near": {
+    "chain_id": "testnet",
+    "network": "testnet",
+    "registry_contract": "nominal-registry-1756126131.testnet",
+    "token_contract": "nominal-token-1756126131.testnet",
+    "deployer": "nominal-deploy-1756060919.testnet",
+    "owner": "nominal-deploy-1756060919.testnet",
+    "treasury": "nominal-deploy-1756060919.testnet",
+    "registration_fee": "0.1",
+    "registration_fee_currency": "NEAR",
+    "token_name": "Mock Nominal Token",
+    "token_symbol": "MNOMINAL",
+    "token_decimals": 18,
+    "faucet_claim_amount": "100",
+    "faucet_cooldown_seconds": 3600,
+    "contract_funding": "5.0 NEAR each"
+  },
+  "aptos": {
+    "chain_id": "testnet",
+    "network": "testnet",
+    "contract_address": "0x435598fcdb806330ced52fefaaa9d140e9cd43e5f2936c9d4497ad9a7e5b867e",
+    "deployer": "0x435598fcdb806330ced52fefaaa9d140e9cd43e5f2936c9d4497ad9a7e5b867e",
+    "owner": "0x435598fcdb806330ced52fefaaa9d140e9cd43e5f2936c9d4497ad9a7e5b867e",
+    "treasury": "0x435598fcdb806330ced52fefaaa9d140e9cd43e5f2936c9d4497ad9a7e5b867e",
+    "token_type": "0x435598fcdb806330ced52fefaaa9d140e9cd43e5f2936c9d4497ad9a7e5b867e::MockNominalToken::MockNominal",
+    "token_name": "Mock Nominal Token",
+    "token_symbol": "MNOMINAL",
+    "token_decimals": 8,
+    "token_supply": 0
+  },
+  "solana": {
+    "chain_id": "devnet",
+    "network": "devnet",
+    "program_id": "6TVpb5Ga5c8mfgiFRddf8T1sGFJbgtzcj2WFQBB1gFMq",
+    "admin_treasury": "EWnxMePYL4SJP2JMfHffwyCJFnsVqmvi4sNwukro7ZmE",
+    "spl_token": {
+      "mint": "64U5kugLyyZNz6kmXVJnjAQF4W2D4TKg3ABN6QDQHLzH",
+      "network": "devnet",
+      "supply_raw": "1000000000000000",
+      "decimals": 9,
+      "uiAmount": 1000000.0,
+      "uiAmountString": "1000000"
+    }
+  },
+  "evm": {
+    "ethereum_sepolia": {
+      "chain_id": 11155111,
+      "registry_contract": "0xa3D1fC54925F57af34B0C86F5B12BD5fD309fFcA",
+      "mock_token": "0x0699b1680FA1b152969a35B437FC7f90Ed1983c0",
+      "deployer": "0x6d82E803564550F191949eC38bA32f6d1af3F8D3",
+      "treasury": "0x6d82E803564550F191949eC38bA32f6d1af3F8D3",
+      "registration_fee_wei": 1000,
+      "referrer_bps": 100,
+      "token_name": "Mock Nominal Token",
+      "token_symbol": "MNOMINAL",
+      "token_decimals": 18,
+      "token_supply": "1000000000000000000000000"
+    },
+    "arbitrum_sepolia": {
+      "chain_id": 421614,
+      "registry_contract": "0x8bD72f7385eBdE241e705e5c6faC6D673BD85718",
+      "mock_token": "0xa30481F5624247e0e532502D79C05B46bD41ad33",
+      "deployer": "0x6d82E803564550F191949eC38bA32f6d1af3F8D3",
+      "treasury": "0x6d82E803564550F191949eC38bA32f6d1af3F8D3",
+      "registration_fee_wei": 1000,
+      "referrer_bps": 100,
+      "token_name": "Mock Nominal Token",
+      "token_symbol": "MNOMINAL",
+      "token_decimals": 18,
+      "token_supply": "1000000000000000000000000"
+    },
+    "base_sepolia": {
+      "chain_id": 84532,
+      "registry_contract": "0x9976E0ed11f2eABF90a48968a955C21cC6E2b7f6",
+      "mock_token": "0xa3D1fC54925F57af34B0C86F5B12BD5fD309fFcA",
+      "deployer": "0x6d82E803564550F191949eC38bA32f6d1af3F8D3",
+      "treasury": "0x6d82E803564550F191949eC38bA32f6d1af3F8D3",
+      "registration_fee_wei": 1000,
+      "referrer_bps": 100,
+      "token_name": "Mock Nominal Token",
+      "token_symbol": "MNOMINAL",
+      "token_decimals": 18,
+      "token_supply": "1000000000000000000000000"
+    },
+    "optimism_sepolia": {
+      "chain_id": 11155420,
+      "registry_contract": "0x4e79c187279D76d893a5b5A0548A19AA61fe220f",
+      "mock_token": "0xE74af50F96394Be0E03dc6cfa5dEE08615C90A15",
+      "deployer": "0x6d82E803564550F191949eC38bA32f6d1af3F8D3",
+      "treasury": "0x6d82E803564550F191949eC38bA32f6d1af3F8D3",
+      "registration_fee_wei": 1000,
+      "referrer_bps": 100,
+      "token_name": "Mock Nominal Token",
+      "token_symbol": "MNOMINAL",
+      "token_decimals": 18,
+      "token_supply": "1000000000000000000000000"
+    }
+  }
+}
