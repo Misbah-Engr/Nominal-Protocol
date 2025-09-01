@@ -28,7 +28,7 @@
     "deployer": "nominal-deploy-1756060919.testnet",
     "owner": "nominal-fixed-1756664452393.testnet",
     "treasury": "nominal-fixed-1756664452393.testnet",
-    "registration_fee": "1",
+    "registration_fee": "0.001",
     "registration_fee_currency": "NEAR",
     "token_name": "Mock Nominal Token",
     "token_symbol": "MNOMINAL",
